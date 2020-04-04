@@ -20,11 +20,14 @@ These instructions will get you a copy of the project up and running on Google C
 
 ## Reading data from Bucket
 
+```
 from google.cloud import storage
 pd_df = pd.read_csv('gs://<<bucket_path>>/<<bucket_file>>')
+```
 
 ## Create Spark Session
 
+```
 spark = SparkSession.builder \
         .appName("fakenews") \
         .config("spark.master", "yarn") \
@@ -35,9 +38,11 @@ spark = SparkSession.builder \
         .config("spark.executor.memory", "25g") \
         .getOrCreate()
 py_df = spark.createDataFrame(pd_df)
+```
 
 ## Folders & Files
 
+```
 1. Old_* folders are initial versions of the programs;
 2. fakenews_v2_baseline_model.ipynb - 
   2.1. models trained and tested with POA feature only from content
@@ -45,17 +50,51 @@ py_df = spark.createDataFrame(pd_df)
 3. fakenews_v2_enhanced_model.ipynb
   3.1. models trained and tested with POA feature only from content
   3.2. models trained and tested with tf-idf feature only from content
-  
+```
+
+## Feature Generation
+
+```
+def build_data_preproc_model_with_pca(vocab_size=5000):
+    preproc_steps = [
+        RegexTokenizer(inputCol="content", outputCol="all_words", pattern=r"\W"),
+        StopWordsRemover(inputCol="all_words", outputCol="words"),
+        CountVectorizer(inputCol="words", outputCol="tf_features", vocabSize=vocab_size),
+        IDF(inputCol="tf_features", outputCol="tfidf_features"),
+        PCA(inputCol="tfidf_features", outputCol="pca_features", k=100),
+        ReviewContentTransformer(inputCol="content", outputCol="content_features"),
+        ReviewWordsTransformer(inputCol="words", outputCol="word_features"),
+        VectorAssembler(inputCols=["pca_features", "content_features", "word_features"], 
+                        outputCol="features")
+    ]
+    return Pipeline(stages=preproc_steps)
+
+def build_data_preproc_model_without_pca(vocab_size=5000):
+    preproc_steps = [
+        RegexTokenizer(inputCol="content", outputCol="all_words", pattern=r"\W"),
+        StopWordsRemover(inputCol="all_words", outputCol="words"),
+        CountVectorizer(inputCol="words", outputCol="tf_features", vocabSize=vocab_size),
+        IDF(inputCol="tf_features", outputCol="tfidf_features"),
+        ReviewContentTransformer(inputCol="content", outputCol="content_features"),
+        ReviewWordsTransformer(inputCol="words", outputCol="word_features"),
+        VectorAssembler(inputCols=["tf_features", "content_features", "word_features"], outputCol="features")
+    ]
+    return Pipeline(stages=preproc_steps)
+```
+
 ## List of Models
 
+```
 1. LogisticRegression
 2. DecisionTreeClassifier
 3. RandomForestClassifier
 4. GBTClassifier
 5. NaiveBayes
+```
 
 ## Upload results and files to Bucket
 
+```
 bucket_root_path = <<bucket_name>>
 project_data_folder = <<bucket_path>>
 
@@ -69,3 +108,4 @@ def upload_files(files):
         print("Upload from local {0} to {1}".format(file, butcketFile))
 
 upload_files([<<file_name>>])
+```
